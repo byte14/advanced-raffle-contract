@@ -1,0 +1,25 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Raffle",
+  "sourceName": "contracts/Raffle.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "enterRaffle",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "pickRandomWinner",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b5060818061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80632cfcc539146037578063898da22914603f575b600080fd5b603d6047565b005b60456049565b005b565b56fea26469706673582212202aefed3df95db877f7bee02027fbd7646f52a95bade974ebf606613b68fd684f64736f6c63430008090033",
+  "deployedBytecode": "0x6080604052348015600f57600080fd5b506004361060325760003560e01c80632cfcc539146037578063898da22914603f575b600080fd5b603d6047565b005b60456049565b005b565b56fea26469706673582212202aefed3df95db877f7bee02027fbd7646f52a95bade974ebf606613b68fd684f64736f6c63430008090033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
