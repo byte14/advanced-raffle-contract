@@ -1,3 +1,6 @@
+require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-chai-matchers");
+require("hardhat-deploy");
 require("dotenv").config();
 
 module.exports = {
@@ -14,6 +17,15 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
     },
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
+  },
+  gasReporter: {
+    enabled: true,
+    outputFile: "gas-report.txt",
+    currency: "USD",
+    noColors: true,
+  },
   namedAccounts: {
     deployer: {
       default: 0,
@@ -23,4 +35,7 @@ module.exports = {
     },
   },
   solidity: "0.8.7",
+  mocha: {
+    timeout: 500000,
+  },
 };
