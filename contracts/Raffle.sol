@@ -9,9 +9,9 @@ error NotEnoughETH();
 error TransferFailed();
 error NotOpen();
 error UpKeepNotNeeded(
-    uint256 currrentBalance,
+    uint256 raffleState,
     uint256 numPlayers,
-    uint256 raffleState
+    uint256 timePassed
 );
 
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
@@ -32,7 +32,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
     address private s_winner;
     RaffleState private s_raffleState;
-    uint256 private s_lastTimeStamp;
+    uint256 private s_lastTimestamp;
     uint256 private immutable i_interval;
 
     event EnterRaffle(address indexed player);
@@ -54,7 +54,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
         s_raffleState = RaffleState.OPEN;
-        s_lastTimeStamp = block.timestamp;
+        s_lastTimestamp = block.timestamp;
         i_interval = interval;
     }
 
@@ -82,9 +82,9 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         )
     {
         bool isOpen = (RaffleState.OPEN == s_raffleState);
-        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
         bool hasPlayer = (s_players.length > 0);
-        upKeepNeeded = (isOpen && timePassed && hasPlayer);
+        bool hasTimePassed = ((block.timestamp - s_lastTimestamp) > i_interval);
+        upKeepNeeded = (isOpen && hasPlayer && hasTimePassed);
     }
 
     function performUpkeep(
@@ -93,9 +93,9 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         (bool upKeepNeeded, ) = checkUpkeep("");
         if (!upKeepNeeded) {
             revert UpKeepNotNeeded(
-                address(this).balance,
+                uint256(s_raffleState),
                 s_players.length,
-                uint256(s_raffleState)
+                block.timestamp - s_lastTimestamp
             );
         }
         s_raffleState = RaffleState.CALCULATING;
@@ -117,7 +117,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         s_winner = s_players[winnerIndex];
         s_raffleState = RaffleState.OPEN;
         s_players = new address payable[](0);
-        s_lastTimeStamp = block.timestamp;
+        s_lastTimestamp = block.timestamp;
         (bool success, ) = s_winner.call{value: address(this).balance}("");
         if (!success) {
             revert TransferFailed();
@@ -137,6 +137,10 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return s_players[_index];
     }
 
+    function getTotalPlayers() public view returns (address payable[] memory) {
+        return s_players;
+    }
+
     function getRecentWinner() public view returns (address) {
         return s_winner;
     }
@@ -149,8 +153,12 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return s_players.length;
     }
 
-    function getLatestTimeStamp() public view returns (uint256) {
-        return s_lastTimeStamp;
+    function getLastTimestamp() public view returns (uint256) {
+        return s_lastTimestamp;
+    }
+
+    function getInterval() public view returns (uint256) {
+        return i_interval;
     }
 
     function getNumWords() public pure returns (uint256) {
@@ -159,9 +167,5 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
     function getRequestConfirmations() public pure returns (uint256) {
         return REUQUEST_CONFIRMATIONS;
-    }
-
-    function getInterval() public view returns (uint256) {
-        return i_interval;
     }
 }
