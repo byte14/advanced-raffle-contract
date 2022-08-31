@@ -2,6 +2,7 @@ const { deployments, getNamedAccounts, ethers, network } = require("hardhat");
 const { expect } = require("chai");
 const { networkConfig } = require("../../helper-hardhat-config");
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 const chainId = network.config.chainId;
 const ENTRY_FEE = networkConfig[chainId]["entryFee"];
@@ -9,6 +10,7 @@ const INTERVAL = Number(networkConfig[chainId]["interval"]);
 const RAFFLE_STATE = {
   OPEN: 0,
   CALCULATING: 1,
+  anyValue,
 };
 
 chainId !== 31337
@@ -106,11 +108,11 @@ chainId !== 31337
           const raffleBalance = await raffle.provider.getBalance(
             raffle.address
           );
-          const players = await raffle.getTotalPlayers();
           const raffleState = await raffle.getRaffleState();
+          const players = await raffle.getTotalPlayers();
           await expect(raffle.performUpkeep("0x"))
             .to.be.revertedWithCustomError(raffle, "UpKeepNotNeeded")
-            .withArgs(raffleBalance, players.length, raffleState);
+            .withArgs(raffleState, players.length, anyValue);
         });
 
         it("updates the raffle state to calculating", async function () {
@@ -131,6 +133,79 @@ chainId !== 31337
           await expect(txResponse)
             .to.emit(raffle, "RequestedRaffleWinner")
             .withArgs(requestId);
+        });
+      });
+
+      describe("fulfillRandomWords", function () {
+        describe("success", function () {
+          let requestId;
+          beforeEach(async function () {
+            const accounts = await ethers.getSigners();
+            for (let i = 1; i <= 5; i++) {
+              await raffle
+                .connect(accounts[i])
+                .enterRaffle({ value: ENTRY_FEE });
+            }
+            await helpers.time.increase(INTERVAL);
+            const txResponse = await raffle.performUpkeep("0x");
+            const txReceipt = await txResponse.wait(1);
+            requestId = txReceipt.events[1].args.requestId;
+          });
+
+          it("updates the raffle state to open", async function () {
+            await vrfCoordinatorV2Mock.fulfillRandomWords(
+              requestId,
+              raffle.address
+            );
+            expect(await raffle.getRaffleState()).to.equal(RAFFLE_STATE.OPEN);
+          });
+
+          it("reset the players array", async function () {
+            await vrfCoordinatorV2Mock.fulfillRandomWords(
+              requestId,
+              raffle.address
+            );
+            const totalPlayers = await raffle.getTotalPlayers();
+            expect(totalPlayers.length).to.equal(0);
+          });
+
+          it("updates the last timestamp with current", async function () {
+            const startingTimestamp = await raffle.getLastTimestamp();
+            await vrfCoordinatorV2Mock.fulfillRandomWords(
+              requestId,
+              raffle.address
+            );
+            expect(await raffle.getLastTimestamp()).to.be.greaterThan(
+              startingTimestamp
+            );
+          });
+
+          it("picks a winner and send all balance", async function () {
+            const totalPlayers = await raffle.getTotalPlayers();
+            for (let i = 0; i < totalPlayers.length; i++) {
+              await helpers.setBalance(totalPlayers[i], 0);
+            }
+            await vrfCoordinatorV2Mock.fulfillRandomWords(
+              requestId,
+              raffle.address
+            );
+            const winner = await raffle.getRecentWinner();
+            const winnerBalance = await raffle.provider.getBalance(winner);
+            expect(winnerBalance).to.equal(ENTRY_FEE.mul(totalPlayers.length));
+          });
+        });
+
+        describe("revert", function () {
+          it("can only be called after performUpkeep", async function () {
+            await raffle.enterRaffle({ value: ENTRY_FEE });
+            await helpers.time.increase(INTERVAL);
+            await expect(
+              vrfCoordinatorV2Mock.fulfillRandomWords(0, raffle.address)
+            ).to.be.revertedWith("nonexistent request");
+            await expect(
+              vrfCoordinatorV2Mock.fulfillRandomWords(1, raffle.address)
+            ).to.be.revertedWith("nonexistent request");
+          });
         });
       });
     });
