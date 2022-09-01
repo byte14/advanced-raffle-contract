@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.8;
 
+import "@chainlink/contracts/src/v0.8/interfaces/LinkTokenInterface.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
@@ -17,12 +18,12 @@ error UpKeepNotNeeded(
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     enum RaffleState {
         OPEN,
-        CALCULATING
+        CLOSED
     }
-
+    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
+    LinkTokenInterface private immutable i_linkToken;
     address private immutable i_owner;
     uint256 private immutable i_entryFee;
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_keyHash;
     uint64 private immutable i_subscriptionId;
     uint32 private immutable i_callbackGasLimit;
@@ -39,23 +40,46 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     event RequestedRaffleWinner(uint256 indexed requestId);
     event PickedWinner(address indexed winner);
 
+    modifier onlyOwner() {
+        require(msg.sender == i_owner);
+        _;
+    }
+
     constructor(
         address vrfCoordinator,
+        address linkToken,
         uint256 entryFee,
         bytes32 keyHash,
-        uint64 subscriptionId,
         uint32 callbackGasLimit,
         uint256 interval
     ) VRFConsumerBaseV2(vrfCoordinator) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
+        i_linkToken = LinkTokenInterface(linkToken);
         i_owner = msg.sender;
         i_entryFee = entryFee;
         i_keyHash = keyHash;
-        i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
+        i_interval = interval;
         s_raffleState = RaffleState.OPEN;
         s_lastTimestamp = block.timestamp;
-        i_interval = interval;
+        i_subscriptionId = i_vrfCoordinator.createSubscription();
+        i_vrfCoordinator.addConsumer(i_subscriptionId, address(this));
+    }
+
+    function fundSubscription(uint256 value) external {
+        i_linkToken.transferAndCall(
+            address(i_vrfCoordinator),
+            value,
+            abi.encode(i_subscriptionId)
+        );
+    }
+
+    function depositLink(uint256 value) external {
+        i_linkToken.transferFrom(msg.sender, address(this), value);
+    }
+
+    function withdrawLink(uint256 value) external onlyOwner {
+        i_linkToken.transfer(msg.sender, value);
     }
 
     function enterRaffle() public payable {
@@ -98,7 +122,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
                 block.timestamp - s_lastTimestamp
             );
         }
-        s_raffleState = RaffleState.CALCULATING;
+        s_raffleState = RaffleState.CLOSED;
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_keyHash,
             i_subscriptionId,
@@ -159,6 +183,10 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
 
     function getInterval() public view returns (uint256) {
         return i_interval;
+    }
+
+    function getSubscriptionId() public view returns (uint64) {
+        return i_subscriptionId;
     }
 
     function getNumWords() public pure returns (uint256) {
