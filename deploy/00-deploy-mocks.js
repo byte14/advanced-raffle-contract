@@ -10,6 +10,10 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
 
   if (chainId === 31337) {
     log("Local network detected! Deploying mocks...");
+    await deploy("LinkToken", {
+      from: deployer,
+      log: true,
+    });
     await deploy("VRFCoordinatorV2Mock", {
       from: deployer,
       log: true,
