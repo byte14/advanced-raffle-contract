@@ -30,13 +30,6 @@ network.config.chainId === 31337
               const winnerEndingBalace = await raffle.provider.getBalance(
                 deployer
               );
-              console.log(
-                rState,
-                totalPlayers.length,
-                startingTimestamp.toString(),
-                endingTimestamp.toString(),
-                winnerEndingBalace.toString()
-              );
 
               expect(rState).to.equal(raffleState.opened);
               expect(totalPlayers.length).to.equal(0);
