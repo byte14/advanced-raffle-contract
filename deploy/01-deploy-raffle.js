@@ -1,9 +1,6 @@
 const { network, ethers } = require("hardhat");
 const { networkConfig } = require("../helper-hardhat-config");
 const { verify } = require("../utils/verify");
-require("dotenv").config();
-
-const SEND_VALUE = ethers.utils.parseEther("2");
 
 module.exports = async function ({ getNamedAccounts, deployments }) {
   const { deploy, log } = deployments;
@@ -26,38 +23,72 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   const keyHash = networkConfig[chainId]["keyHash"];
   const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"];
   const interval = networkConfig[chainId]["interval"];
+  const registrar = networkConfig[chainId]["registrar"];
+  const registry = networkConfig[chainId]["registry"];
+  const fundVRFAmount = networkConfig[chainId]["fundVRFAmount"];
 
-  const arguments = [
+  const raffleArgs = [
     vrfCoordinatorV2Address,
     linkTokenAddress,
     entryFee,
     keyHash,
     callbackGasLimit,
     interval,
+    registrar,
+    registry,
   ];
 
   await deploy("Raffle", {
     from: deployer,
-    args: arguments,
+    args: raffleArgs,
     log: true,
     waitConfirmations: network.config.blockConfirmations,
   });
 
-  const raffle = await ethers.getContract("Raffle", deployer);
-
   if (chainId === 31337) {
-    await vrfCoordinatorV2Mock.fundSubscription(1, SEND_VALUE);
+    // Subscription for Chainlik VRF on mock contract
+    await vrfCoordinatorV2Mock.fundSubscription(1, fundVRFAmount);
   } else {
+    const upkeepName = networkConfig[chainId]["upkeepName"];
+    const encryptedEmail = networkConfig[chainId]["encryptedEmail"];
+    const checkData = networkConfig[chainId]["checkData"];
+    const fundUpkeepAmount = networkConfig[chainId]["fundUpkeepAmount"];
+    const source = networkConfig[chainId]["source"];
+
+    const raffle = await ethers.getContract("Raffle", deployer);
     const linkToken = await ethers.getContractAt("LinkToken", linkTokenAddress);
-    const approveLinkTX = await linkToken.approve(raffle.address, SEND_VALUE);
-    await approveLinkTX.wait(1);
-    const depositLinkTx = await raffle.depositLink(SEND_VALUE);
+
+    // Approve and Deposit Link token into the contract
+    const approveLinkTx = await linkToken.approve(
+      raffle.address,
+      fundUpkeepAmount.add(fundVRFAmount)
+    );
+    await approveLinkTx.wait(1);
+    const depositLinkTx = await raffle.depositLink(
+      fundUpkeepAmount.add(fundVRFAmount)
+    );
     await depositLinkTx.wait(1);
-    const fundSubscriptionTx = await raffle.fundSubscription(SEND_VALUE);
+
+    // Registration of an Upkeep
+    const upkeepRegisterTx = await raffle.registerAndPredictID(
+      upkeepName,
+      encryptedEmail,
+      raffle.address,
+      callbackGasLimit,
+      deployer,
+      checkData,
+      fundUpkeepAmount,
+      source
+    );
+    await upkeepRegisterTx.wait(1);
+
+    // Subscription for Chainlink VRF
+    const fundSubscriptionTx = await raffle.fundVRFSubscription(fundVRFAmount);
     await fundSubscriptionTx.wait(1);
 
+    // Contract verification on Etherscan
     if (process.env.ETHERSCAN_API_KEY) {
-      await verify(raffle.address, arguments);
+      await verify(raffle.address, raffleArgs);
     }
   }
   log("______________________________________________________");
