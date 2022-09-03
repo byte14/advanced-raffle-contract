@@ -4,3 +4,5 @@ cache
 .env
 deployments
 gas-report.txt
+coverage.json
+coverage

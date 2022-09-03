@@ -34,7 +34,16 @@ module.exports = {
       default: 0,
     },
   },
-  solidity: "0.8.7",
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.8",
+      },
+      {
+        version: "0.4.24",
+      },
+    ],
+  },
   mocha: {
     timeout: 500000,
   },
