@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.6;
+pragma solidity ^0.8.8;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
@@ -29,7 +29,6 @@ contract Raffle is
     uint16 private constant REUQUEST_CONFIRMATIONS = 3;
     uint32 private constant NUM_WORDS = 1;
     address payable[] private s_players;
-
     address private s_winner;
     RaffleState private s_raffleState;
     uint256 private s_lastTimestamp;
@@ -58,10 +57,10 @@ contract Raffle is
         i_interval = interval;
         s_raffleState = RaffleState.OPEN;
         s_lastTimestamp = block.timestamp;
-        addConsumer(address(this));
+        addVRFConsumer(address(this));
     }
 
-    function enterRaffle() public payable {
+    function enterRaffle() external payable {
         if (msg.value < i_entryFee) {
             revert NotEnoughETH();
         }
@@ -128,43 +127,47 @@ contract Raffle is
         emit PickedWinner(s_winner);
     }
 
-    function getEntryFee() public view returns (uint256) {
+    function getEntryFee() external view returns (uint256) {
         return i_entryFee;
     }
 
-    function getPlayer(uint256 _index) public view returns (address) {
+    function getPlayer(uint256 _index) external view returns (address) {
         return s_players[_index];
     }
 
-    function getTotalPlayers() public view returns (address payable[] memory) {
+    function getTotalPlayers()
+        external
+        view
+        returns (address payable[] memory)
+    {
         return s_players;
     }
 
-    function getRecentWinner() public view returns (address) {
+    function getRecentWinner() external view returns (address) {
         return s_winner;
     }
 
-    function getRaffleState() public view returns (RaffleState) {
+    function getRaffleState() external view returns (RaffleState) {
         return s_raffleState;
     }
 
-    function getNumberOfPlayers() public view returns (uint256) {
+    function getNumberOfPlayers() external view returns (uint256) {
         return s_players.length;
     }
 
-    function getLastTimestamp() public view returns (uint256) {
+    function getLastTimestamp() external view returns (uint256) {
         return s_lastTimestamp;
     }
 
-    function getInterval() public view returns (uint256) {
+    function getInterval() external view returns (uint256) {
         return i_interval;
     }
 
-    function getNumWords() public pure returns (uint256) {
+    function getNumWords() external pure returns (uint256) {
         return NUM_WORDS;
     }
 
-    function getRequestConfirmations() public pure returns (uint256) {
+    function getRequestConfirmations() external pure returns (uint256) {
         return REUQUEST_CONFIRMATIONS;
     }
 }

@@ -120,39 +120,39 @@ network.config.chainId !== 31337
       });
 
       describe("performUpKeep", function () {
-        it("can only run if upKeeepNeeded is true", async function () {
-          await raffle.enterRaffle({ value: entryFee });
-          await helpers.time.increase(interval);
-          await expect(raffle.performUpkeep("0x")).not.to.be.reverted;
+        describe("success", function () {
+          beforeEach(async function () {
+            await raffle.enterRaffle({ value: entryFee });
+            await helpers.time.increase(interval);
+          });
+
+          it("can only run if upKeeepNeeded is true", async function () {
+            await expect(raffle.performUpkeep("0x")).not.to.be.reverted;
+          });
+
+          it("updates the raffle state to closed", async function () {
+            await raffle.performUpkeep("0x");
+            expect(await raffle.getRaffleState()).to.equal(raffleState.closed);
+          });
+
+          it("emits 'RequestedRaffleWinner' event", async function () {
+            const txResponse = await raffle.performUpkeep("0x");
+            const txReceipt = await txResponse.wait(1);
+            const requestId = txReceipt.events[1].args.requestId;
+            await expect(txResponse)
+              .to.emit(raffle, "RequestedRaffleWinner")
+              .withArgs(requestId);
+          });
         });
 
-        it("reverts when upKeepNeeded is false", async function () {
-          const raffleBalance = await raffle.provider.getBalance(
-            raffle.address
-          );
-          const rState = await raffle.getRaffleState();
-          const players = await raffle.getTotalPlayers();
-          await expect(raffle.performUpkeep("0x"))
-            .to.be.revertedWithCustomError(raffle, "UpKeepNotNeeded")
-            .withArgs(rState, players.length, anyValue);
-        });
-
-        it("updates the raffle state to closed", async function () {
-          await raffle.enterRaffle({ value: entryFee });
-          await helpers.time.increase(interval);
-          await raffle.performUpkeep("0x");
-          expect(await raffle.getRaffleState()).to.equal(raffleState.closed);
-        });
-
-        it("emits 'RequestedRaffleWinner' event", async function () {
-          await raffle.enterRaffle({ value: entryFee });
-          await helpers.time.increase(interval);
-          const txResponse = await raffle.performUpkeep("0x");
-          const txReceipt = await txResponse.wait(1);
-          const requestId = txReceipt.events[1].args.requestId;
-          await expect(txResponse)
-            .to.emit(raffle, "RequestedRaffleWinner")
-            .withArgs(requestId);
+        describe("revert", function () {
+          it("reverts when upKeepNeeded is false", async function () {
+            const rState = await raffle.getRaffleState();
+            const players = await raffle.getTotalPlayers();
+            await expect(raffle.performUpkeep("0x"))
+              .to.be.revertedWithCustomError(raffle, "UpKeepNotNeeded")
+              .withArgs(rState, players.length, anyValue);
+          });
         });
       });
 

@@ -124,14 +124,6 @@ contract SubscriptionManager {
         }
     }
 
-    function fundUpkeep(uint96 value) external {
-        i_registry.addFunds(s_upkeepId, value);
-    }
-
-    function cancelUpkeep() external {
-        i_registry.cancelUpkeep(s_upkeepId);
-    }
-
     function getOwner() external view returns (address) {
         return i_owner;
     }
