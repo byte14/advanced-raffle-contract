@@ -21,7 +21,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
 
   const entryFee = networkConfig[chainId]["entryFee"];
   const keyHash = networkConfig[chainId]["keyHash"];
-  const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"];
+  const vrfCallbackGasLimit = networkConfig[chainId]["vrfCallbackGasLimit"];
   const interval = networkConfig[chainId]["interval"];
   const registrar = networkConfig[chainId]["registrar"];
   const registry = networkConfig[chainId]["registry"];
@@ -32,7 +32,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     linkTokenAddress,
     entryFee,
     keyHash,
-    callbackGasLimit,
+    vrfCallbackGasLimit,
     interval,
     registrar,
     registry,
@@ -51,6 +51,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   } else {
     const upkeepName = networkConfig[chainId]["upkeepName"];
     const encryptedEmail = networkConfig[chainId]["encryptedEmail"];
+    const upkeepGasLimit = networkConfig[chainId]["upkeepGasLimit"];
     const checkData = networkConfig[chainId]["checkData"];
     const fundUpkeepAmount = networkConfig[chainId]["fundUpkeepAmount"];
     const source = networkConfig[chainId]["source"];
@@ -59,23 +60,25 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     const linkToken = await ethers.getContractAt("LinkToken", linkTokenAddress);
 
     // Approve and Deposit Link token into the contract
+    console.log("Approving Link token...");
     const approveLinkTx = await linkToken.approve(
       raffle.address,
       fundUpkeepAmount.add(fundVRFAmount)
     );
     await approveLinkTx.wait(1);
+    console.log("Depositig Link token...");
     const depositLinkTx = await raffle.depositLink(
       fundUpkeepAmount.add(fundVRFAmount)
     );
     await depositLinkTx.wait(1);
 
     // Registration of an Upkeep
-    const upkeepRegisterTx = await raffle.registerAndPredictID(
+    console.log("Registering Upkeep...");
+    const upkeepRegisterTx = await raffle.registerUpkeep(
       upkeepName,
       encryptedEmail,
       raffle.address,
-      callbackGasLimit,
-      deployer,
+      upkeepGasLimit,
       checkData,
       fundUpkeepAmount,
       source
@@ -83,6 +86,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     await upkeepRegisterTx.wait(1);
 
     // Subscription for Chainlink VRF
+    console.log("Funding Chainlink VRF subscription...");
     const fundSubscriptionTx = await raffle.fundVRFSubscription(fundVRFAmount);
     await fundSubscriptionTx.wait(1);
 
