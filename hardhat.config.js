@@ -1,6 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-chai-matchers");
 require("hardhat-deploy");
+require("hardhat-contract-sizer");
 require("dotenv").config();
 
 module.exports = {
@@ -29,12 +30,14 @@ module.exports = {
     outputFile: "gas-report.txt",
     currency: "USD",
     noColors: true,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+  },
+  contractSizer: {
+    runOnCompile: false,
+    only: [],
   },
   namedAccounts: {
     deployer: {
-      default: 0,
-    },
-    player: {
       default: 0,
     },
   },
