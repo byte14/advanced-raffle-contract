@@ -27,6 +27,7 @@ contract SubscriptionManager {
     address private immutable i_owner;
     bytes4 private constant REGISTER_SIG =
         KeeperRegistrarInterface.register.selector;
+    uint256 private s_upkeepId;
     uint64 internal s_subscriptionId;
 
     modifier onlyOwner() {
@@ -35,15 +36,15 @@ contract SubscriptionManager {
     }
 
     constructor(
-        address _vrfCoordinator,
-        address _link,
-        address _registrar,
-        address _registry
+        address vrfCoordinator,
+        address link,
+        address registrar,
+        address registry
     ) {
-        i_vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
-        i_link = LinkTokenInterface(_link);
-        i_registrar = _registrar;
-        i_registry = KeeperRegistryInterface(_registry);
+        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinator);
+        i_link = LinkTokenInterface(link);
+        i_registrar = registrar;
+        i_registry = KeeperRegistryInterface(registry);
         i_owner = msg.sender;
         createVRFSubscription();
     }
@@ -68,21 +69,20 @@ contract SubscriptionManager {
         );
     }
 
-    function addConsumer(address consumerAddress) public onlyOwner {
+    function addVRFConsumer(address consumerAddress) public onlyOwner {
         i_vrfCoordinator.addConsumer(s_subscriptionId, consumerAddress);
     }
 
-    function cancelVRFSubscription(address receivingWallet) external onlyOwner {
-        i_vrfCoordinator.cancelSubscription(s_subscriptionId, receivingWallet);
+    function cancelVRFSubscription() external onlyOwner {
+        i_vrfCoordinator.cancelSubscription(s_subscriptionId, i_owner);
         s_subscriptionId = 0;
     }
 
-    function registerAndPredictID(
+    function registerUpkeep(
         string memory name,
         bytes calldata encryptedEmail,
         address upkeepContract,
         uint32 gasLimit,
-        address adminAddress,
         bytes calldata checkData,
         uint96 amount,
         uint8 source
@@ -95,7 +95,7 @@ contract SubscriptionManager {
             encryptedEmail,
             upkeepContract,
             gasLimit,
-            adminAddress,
+            msg.sender,
             checkData,
             amount,
             source,
@@ -110,7 +110,7 @@ contract SubscriptionManager {
         (state, _c, _k) = i_registry.getState();
         uint256 newNonce = state.nonce;
         if (newNonce == oldNonce + 1) {
-            uint256 upkeepID = uint256(
+            s_upkeepId = uint256(
                 keccak256(
                     abi.encodePacked(
                         blockhash(block.number - 1),
@@ -119,13 +119,35 @@ contract SubscriptionManager {
                     )
                 )
             );
-            // DEV - Use the upkeepID however you see fit
         } else {
             revert("auto-approve disabled");
         }
     }
 
-    function getOwner() public view returns (address) {
+    function fundUpkeep(uint96 value) external {
+        i_registry.addFunds(s_upkeepId, value);
+    }
+
+    function cancelUpkeep() external {
+        i_registry.cancelUpkeep(s_upkeepId);
+    }
+
+    function getOwner() external view returns (address) {
         return i_owner;
+    }
+
+    function getUpkeepId() external view returns (uint256) {
+        return s_upkeepId;
+    }
+
+    function getSubscriptionId() external view returns (uint64) {
+        return s_subscriptionId;
+    }
+
+    function getVRFSubscriptionBalance() external view returns (uint256) {
+        (uint256 balance, , , ) = i_vrfCoordinator.getSubscription(
+            s_subscriptionId
+        );
+        return balance;
     }
 }
