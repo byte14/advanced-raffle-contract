@@ -14,15 +14,21 @@ error UpKeepNotNeeded(
     uint256 timePassed
 );
 
+/**@title A Raffle Contract
+ * @author Avishek Raj Panta
+ * @dev This implements the Chainlink VRF and Chainlink Keepers
+ */
 contract Raffle is
     VRFConsumerBaseV2,
     KeeperCompatibleInterface,
     SubscriptionManager
 {
+    // Type declaration
     enum RaffleState {
         OPEN,
         CLOSED
     }
+    // State variables
     uint256 private immutable i_entryFee;
     bytes32 private immutable i_keyHash;
     uint32 private immutable i_callbackGasLimit;
@@ -34,10 +40,16 @@ contract Raffle is
     uint256 private s_lastTimestamp;
     uint256 private immutable i_interval;
 
+    // Events
     event EnterRaffle(address indexed player);
     event RequestedRaffleWinner(uint256 indexed requestId);
     event PickedWinner(address indexed winner);
 
+    /**
+     * @dev Set the values for i_entryFee, i_keyHash, i_callbackGasLimit
+     * i_interval, s_raffleState, and s_lastTimestamp.
+     * Adds this contract as a consumer for the VRF subscription.
+     */
     constructor(
         address vrfCoordinator,
         address linkToken,
@@ -60,6 +72,11 @@ contract Raffle is
         addVRFConsumer(address(this));
     }
 
+    /**
+     * @dev Invoked by players to enter the raffle.
+     * Must send ETH atleast equivalent to 'entryFee'
+     * Raffle State needs to be open
+     */
     function enterRaffle() external payable {
         if (msg.value < i_entryFee) {
             revert NotEnoughETH();
@@ -71,6 +88,13 @@ contract Raffle is
         s_players.push(payable(msg.sender));
         emit EnterRaffle(msg.sender);
     }
+
+    /**
+     * @dev Invoked by Chainlink Keeper node to check 'UpkeepNeed' is true.
+     * Raffle State must be open.
+     * Must have Players entered in the Raffle.
+     * The time interval must be passed.
+     */
 
     function checkUpkeep(
         bytes memory /* checkData */
@@ -88,6 +112,13 @@ contract Raffle is
         bool hasTimePassed = ((block.timestamp - s_lastTimestamp) > i_interval);
         upKeepNeeded = (isOpen && hasPlayer && hasTimePassed);
     }
+
+    /**
+     * @dev If 'checkUpkeep' returns true, this function is invoked
+     * and it submits the request for random winner to the VRF
+     * coordinator contract.
+     * VRF Subscription must be funded sufficiently.
+     */
 
     function performUpkeep(
         bytes calldata /* performData */
@@ -111,6 +142,11 @@ contract Raffle is
         emit RequestedRaffleWinner(requestId);
     }
 
+    /**
+     * @dev Invoked by Chainlink VRF node to receive
+     * the random winner and send money to the winner
+     * Resets the Raffle State, Players and Timestamp
+     */
     function fulfillRandomWords(uint256, uint256[] memory randomWords)
         internal
         override
@@ -127,6 +163,7 @@ contract Raffle is
         emit PickedWinner(s_winner);
     }
 
+    // Getter functions
     function getEntryFee() external view returns (uint256) {
         return i_entryFee;
     }
